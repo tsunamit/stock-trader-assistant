@@ -20,31 +20,12 @@ def main():
     browser = webdriver.Chrome(chrome_options=chrome_options)
     print("Chrome browser initialized. Fetching URL...")
 
-    tweets = search_twitter("twillio", browser, PAGES_TO_SCROLL)
+    tweets = search_twitter("quotation", browser, PAGES_TO_SCROLL)
 
-    for tweet in tweets:
-        print(tweet)
-        print()
+    save_tweets_to_csv(tweets, 'out.csv')
 
     print("Assistant offline... Goodbye!")
 
-
-
-def __get_twitter_user_info(username):
-    user_page_url = "https://twitter.com/{}".format(username)
-    soup = BeautifulSoup(__requests_fetch_page(user_page_url), 'lxml')
-    
-    # Get follwers count: li class=ProfileNav-item--followers
-    followers_li_elt = soup.find("li", {"class":
-                       "ProfileNav-item--followers"})
-    followers_span_elt = followers_li_elt.find("span", 
-                         {"class" : "ProfileNav-value"})
-    follower_count = int(followers_span_elt.get('data-count'))
-
-    return {
-        "follower_count": follower_count
-    } 
-    
     
 
 def search_twitter(search_terms, browser, scroll_dist=10):
@@ -69,13 +50,40 @@ def scrape_page_for_tweets(url, browser, scroll_dist=10):
     return  __get_tweet_info(html)
 
 
-def save_tweets_to_csv(tweets):
+def save_tweets_to_csv(tweets, filename):
     '''
     Take tweets and save to a csv in following format:
-    tweet_id, username, tweet_likes, tweet_retweets, 
-    tweet_timestamp, tweet_content 
+    id, user, favorites, retweets, timestamp, content 
     '''
-    print("boo... you haven't implemented this yet")
+    print("Saving tweet data to {}...".format(filename))
+    with open(filename, 'w') as fd:
+        # Print col descriptors
+        print("{},{},{},{},{},{},{}"
+              .format(
+                    'id',
+                    'timestamp',
+                    'user',
+                    'user_followers',
+                    'favorites',
+                    'retweets',
+                    'content'
+              ), file=fd)
+        for tweet in tweets:
+            print("{},{},{},{},{},{},{}"
+                  .format(
+                      tweet['id'],
+                      tweet['timestamp'],
+                      tweet['user'],
+                      tweet['user_followers'],
+                      tweet['favorites'],
+                      tweet['retweets'],
+                      ("\"{}\"".format(tweet['content']
+                        .replace('\n', ' ')
+                        .replace('"', '""')
+                      ))
+                  ), file=fd)
+    print("Done!")
+
      
 
 
@@ -108,7 +116,8 @@ def __get_tweet_info(html):
         favorites_html = favorites_div_html.find("span", {"class":
                          "ProfileTweet-actionCountForPresentation"})
         tweet_favorites = (0 if favorites_html.text == "" 
-                          else int(favorites_html.text))
+                          else __convert_twitter_str_to_num(
+                              favorites_html.text))
 
         # Get retweets
         retweets_div_html = tweet_html.find("div", 
@@ -116,7 +125,8 @@ def __get_tweet_info(html):
         retweets_html = retweets_div_html.find("span", {"class": 
                         "ProfileTweet-actionCountForPresentation"})
         tweet_retweets = (0 if retweets_html.text == ""
-                         else int(retweets_html.text))
+                         else __convert_twitter_str_to_num(
+                             retweets_html.text))
         
 
         # Get content
@@ -144,6 +154,24 @@ def __get_tweet_info(html):
     log_benchmark_time_per_tweet(benchmark_start, benchmark_end, len(tweets))
         
     return tweets
+
+
+
+def __get_twitter_user_info(username):
+    user_page_url = "https://twitter.com/{}".format(username)
+    soup = BeautifulSoup(__requests_fetch_page(user_page_url), 'lxml')
+    
+    # Get follwers count: li class=ProfileNav-item--followers
+    followers_li_elt = soup.find("li", {"class":
+                       "ProfileNav-item--followers"})
+    followers_span_elt = followers_li_elt.find("span", 
+                         {"class" : "ProfileNav-value"})
+    follower_count = int(followers_span_elt.get('data-count'))
+
+    return {
+        "follower_count": follower_count
+    } 
+
 
 
 def __requests_fetch_page(url):
@@ -182,6 +210,24 @@ def __fetch_twitter_page(url, scroll_dist, browser):
                    .format(benchmark_delta)))
 
     return html
+
+
+def __convert_twitter_str_to_num(num_str):
+    multiplier = 1
+    if num_str[-1] == 'K':
+        multiplier = 1000
+    elif num_str[-1] == 'M':
+        multiplier = 1000000
+    elif num_str[-1] == 'B':
+        multiplier = 1000000000
+        
+    num = 0
+    if multiplier == 1:
+        num = int(num_str)
+    else:
+        num = int(num_str[:1]) * multiplier
+    return num
+
 
 
 
