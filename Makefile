@@ -1,6 +1,7 @@
 default: assistant
 
 assistant:
+	clear
 	python3 assistant.py
 
 scrape:
